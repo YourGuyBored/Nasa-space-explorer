@@ -10,18 +10,35 @@ all the weird JSON stuff lives in one spot where I can find it.
 
 To run it:
     pip install -r requirements.txt
-    cp .env.example .env  (then drop your api.nasa.gov key in there)
+    cp .env.example .env  (you can skip this — I auto-create it on
+        first run. then drop your api.nasa.gov key in there.
+        no key? APOD just uses DEMO_KEY, rate-limited but fine)
     python app.py
 then open http://127.0.0.1:5002 and go look at nebulas.
 """
 
 import os
+import shutil
 
 import requests
 from dotenv import load_dotenv
 from flask import Flask, jsonify, render_template, request
 
-load_dotenv()
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ENV_PATH = os.path.join(BASE_DIR, ".env")
+ENV_EXAMPLE_PATH = os.path.join(BASE_DIR, ".env.example")
+
+# If someone just clones this and never runs `cp .env.example .env`,
+# I just make the file for them so there's always somewhere to paste a key.
+# Never touches an existing .env — that one might have a real key in it.
+if not os.path.exists(ENV_PATH) and os.path.exists(ENV_EXAMPLE_PATH):
+    try:
+        shutil.copy(ENV_EXAMPLE_PATH, ENV_PATH)
+        print("  [setup] no .env found, made one from .env.example.")
+    except OSError as exc:
+        print(f"  [setup] couldn't make .env: {exc}")
+
+load_dotenv(ENV_PATH)
 
 app = Flask(__name__)
 
@@ -31,7 +48,28 @@ app = Flask(__name__)
 # images-api.nasa.gov (the image search) doesn't care about keys at all.
 # api.nasa.gov (APOD and friends) does, so I keep mine in .env and
 # never hardcode it. learned that lesson already, not doing it again.
-NASA_API_KEY = os.getenv("NASA_API_KEY", "DEMO_KEY")
+# No key? No problem — "DEMO_KEY" works out of the box, just
+# rate-limited. So the gallery always runs, key or no key.
+DEMO_KEY = "DEMO_KEY"
+_PLACEHOLDER_KEYS = {"", "your_key_here", "paste_your_key_here", "changeme", "xxx"}
+
+
+def resolve_api_key():
+    """Figure out which NASA key to actually send.
+
+    .env missing, key left blank, or still sitting on the
+    "your_key_here" placeholder from the example file — all of that
+    just means DEMO_KEY. Keeps /api/apod working (within its low
+    limits) instead of blowing up over a missing key.
+    """
+    raw = (os.getenv("NASA_API_KEY") or "").strip().strip("\"'")
+    if not raw or raw.lower() in _PLACEHOLDER_KEYS:
+        return DEMO_KEY
+    return raw
+
+
+NASA_API_KEY = resolve_api_key()
+USING_DEMO_KEY = NASA_API_KEY == DEMO_KEY
 NASA_SEARCH = "https://images-api.nasa.gov/search"
 NASA_APOD = "https://api.nasa.gov/planetary/apod"
 REQUEST_TIMEOUT = 15
@@ -196,9 +234,10 @@ def api_asset():
 
 @app.route("/api/apod")
 def api_apod():
-    """Today's astronomy picture. This one's from api.nasa.gov so it needs
-    my key from .env — without it you just get rate-limited to death."""
-    params = {"api_key": NASA_API_KEY}
+    """Today's astronomy picture. This one's from api.nasa.gov so it wants
+    a key — no key on file just means DEMO_KEY, rate-limited but fine.
+    Never 500s over a missing .env, that'd be dumb."""
+    params = {"api_key": resolve_api_key()}
     date = (request.args.get("date") or "").strip()
     if date:
         params["date"] = date
@@ -217,6 +256,11 @@ if __name__ == "__main__":
     print()
     print("  NASA Deep Space & Earth Image Explorer")
     print("  ->  http://127.0.0.1:5002")
+    if USING_DEMO_KEY:
+        print("  [apod] no personal key in .env, using DEMO_KEY (rate-limited).")
+        print("         drop your api.nasa.gov key in .env for higher limits.")
+    else:
+        print("  [apod] using your NASA_API_KEY from .env.")
     print("  Ctrl+C to stop.")
     print()
     app.run(host="127.0.0.1", port=5002, debug=False)

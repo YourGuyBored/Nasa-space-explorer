@@ -34,14 +34,19 @@ pip install -r requirements.txt
 That's just `flask` (the server), `requests` (talks to NASA), and
 `python-dotenv` (loads your key from `.env`). Takes like 10 seconds.
 
-4. Set up your key file:
+4. Set up your key file (optional — demo key works out of the box):
 ```bash
 cp .env.example .env
 ```
 Then open `.env` and paste your api.nasa.gov key in there. Heads up —
 the image search works fine without any key, this is only for the
-picture-of-the-day route (`/api/apod`). If you skip it, that one route
-just uses the demo key and gets rate-limited fast.
+picture-of-the-day route (`/api/apod`). Skip it, or leave the
+`your_key_here` placeholder in place, and that route just uses NASA's
+public `DEMO_KEY` instead. Rate-limited fast, but the app still runs,
+nothing crashes over a missing key.
+
+Forgot the `cp` step? Don't worry about it — the server makes `.env`
+from `.env.example` by itself on first run.
 
 5. Start it:
 ```bash
@@ -60,7 +65,7 @@ use the venv, or if you really don't want one: `pip install --break-system-packa
 
 ## About the API key
 
-Fun quirk: the image search doesn't need a key at all. But the astronomy-picture-of-the-day route (`/api/apod`) does, so it reads `NASA_API_KEY` out of `.env`. That file's gitignored, so don't commit the real key — I left an example one to copy from.
+Fun quirk: the image search doesn't need a key at all. But the astronomy-picture-of-the-day route (`/api/apod`) does, so it reads `NASA_API_KEY` out of `.env`. That file's gitignored, so don't commit the real key — I left an example one to copy from. Missing, blank, or still sitting on `your_key_here`? Falls back to `DEMO_KEY` on its own, so APOD keeps answering (within NASA's demo rate limits).
 
 ## Try it
 
